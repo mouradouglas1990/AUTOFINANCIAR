@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoFinance Multibancos — Login</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .login-page { flex-direction: column; gap: 0; }
+    .error-msg {
+      background: rgba(255,77,106,0.1);
+      border: 1px solid rgba(255,77,106,0.3);
+      color: #FF4D6A;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+    .demo-creds {
+      margin-top: 24px;
+      background: rgba(0,194,255,0.05);
+      border: 1px solid rgba(0,194,255,0.15);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .demo-creds p { font-size: 0.75rem; color: var(--gray-400); margin-bottom: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+    .demo-item {
+      font-size: 0.8rem;
+      color: var(--gray-200);
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .demo-item code {
+      color: var(--cyan);
+      background: rgba(0,194,255,0.1);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+    }
+    .fill-btn {
+      font-size: 0.72rem;
+      color: var(--cyan);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-bg"></div>
+
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="brand">Auto<span>Finance</span></div>
+        <div class="sub">Simulador Multibancos</div>
+      </div>
+
+      <div class="login-form">
+        <div class="form-group">
+          <label>E-mail</label>
+          <input type="email" id="email" placeholder="seu@email.com" autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label>Senha</label>
+          <input type="password" id="senha" placeholder="••••••••" autocomplete="current-password">
+        </div>
+
+        <div id="errorMsg" class="error-msg">E-mail ou senha incorretos.</div>
+
+        <button class="btn btn-primary btn-full btn-lg" onclick="fazerLogin()">
+          Entrar
+        </button>
+      </div>
+
+      <div class="demo-creds">
+        <p>🔑 Credenciais de demonstração</p>
+        <div class="demo-item">
+          <span>Admin</span>
+          <span><code>admin@autofinance.com</code> / <code>admin123</code></span>
+        </div>
+        <div class="demo-item">
+          <span>Lojista 1</span>
+          <span><code>lojista1@autonova.com</code> / <code>loja123</code></span>
+        </div>
+        <div class="demo-item">
+          <span>Lojista 2</span>
+          <span><code>lojista2@meganove.com</code> / <code>mega123</code></span>
+        </div>
+        <button class="fill-btn" onclick="preencherDemo('admin')">Preencher como Admin</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const USERS = [
+      { email: 'admin@autofinance.com', senha: 'admin123', role: 'admin', nome: 'Administrador', loja: 'AutoFinance' },
+      { email: 'lojista1@autonova.com', senha: 'loja123', role: 'lojista', nome: 'João Silva', loja: 'AutoNova' },
+      { email: 'lojista2@meganove.com', senha: 'mega123', role: 'lojista', nome: 'Maria Souza', loja: 'MegaNove' },
+    ];
+
+    function fazerLogin() {
+      const email = document.getElementById('email').value.trim();
+      const senha = document.getElementById('senha').value;
+      const err   = document.getElementById('errorMsg');
+
+      const user = USERS.find(u => u.email === email && u.senha === senha);
+      if (!user) {
+        err.classList.add('show');
+        return;
+      }
+      err.classList.remove('show');
+      sessionStorage.setItem('afUser', JSON.stringify(user));
+      window.location.href = 'index.html';
+    }
+
+    function preencherDemo(tipo) {
+      const u = USERS.find(x => x.role === tipo) || USERS[0];
+      document.getElementById('email').value = u.email;
+      document.getElementById('senha').value = u.senha;
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin(); });
+
+    // Redirecionar se já logado
+    if (sessionStorage.getItem('afUser')) window.location.href = 'index.html';
+  </script>
+</body>
+</html>

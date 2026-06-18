@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoFinance Multibancos</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- OVERLAY MOBILE -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <div class="app-wrapper">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-mark">
+          <span>Auto</span>Finance
+        </div>
+        <div class="logo-sub">Simulador Multibancos</div>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebarNav">
+        <!-- preenchido pelo JS -->
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-chip">
+          <div class="user-avatar" id="userAvatar">AF</div>
+          <div class="user-info">
+            <div class="user-name" id="userName">Carregando...</div>
+            <div class="user-role" id="userRole">—</div>
+          </div>
+          <button class="btn-logout" onclick="logout()" title="Sair">⏻</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main-content">
+      <div class="topbar">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+          <div>
+            <div class="topbar-title" id="topbarTitle">AutoFinance</div>
+            <div id="topbarSubtitle" style="font-size:0.72rem;color:var(--gray-400)"></div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span style="font-size:0.78rem;color:var(--gray-400)" id="topbarDate"></span>
+        </div>
+      </div>
+
+      <div class="page-content" id="pageContent">
+        <!-- conteúdo dinâmico -->
+      </div>
+    </main>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="js/app.js"></script>
+  <script>
+    // Data no topbar
+    document.getElementById('topbarDate').textContent =
+      new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' });
+  </script>
+</body>
+</html>

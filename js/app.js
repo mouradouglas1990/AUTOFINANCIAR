@@ -469,7 +469,8 @@ const PORTAIS = {
 };
 
 function abrirPortal(bancoId) {
-  const url = PORTAIS[bancoId] || '#';
+  const creds = getCredenciais();
+  const url = (creds[bancoId] && creds[bancoId].site) || PORTAIS[bancoId] || '#';
   window.open(url, '_blank');
 }
 
@@ -776,8 +777,12 @@ function renderRelatorios() {
 }
 
 // ── CREDENCIAIS ───────────────────────────────
+function chaveCredenciais() {
+  return `af_credenciais_${(currentUser && currentUser.email) || 'default'}`;
+}
+
 function getCredenciais() {
-  try { return JSON.parse(localStorage.getItem('af_credenciais') || '{}'); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(chaveCredenciais()) || '{}'); } catch { return {}; }
 }
 
 function renderCredenciais() {
@@ -802,6 +807,10 @@ function renderCredenciais() {
             <label>Senha</label>
             <input type="password" id="cred_senha_${b.id}" value="${c.senha||''}" placeholder="••••••">
           </div>
+          <div class="form-group mb-8">
+            <label>Site do Portal</label>
+            <input type="text" id="cred_site_${b.id}" value="${c.site || ''}" placeholder="https://...">
+          </div>
           <button class="btn btn-secondary btn-sm btn-full" onclick="salvarCredencial('${b.id}')">Salvar</button>
         </div>`;
       }).join('')}
@@ -814,8 +823,9 @@ function salvarCredencial(id) {
   creds[id] = {
     login: document.getElementById(`cred_login_${id}`).value,
     senha: document.getElementById(`cred_senha_${id}`).value,
+    site:  document.getElementById(`cred_site_${id}`).value,
   };
-  localStorage.setItem('af_credenciais', JSON.stringify(creds));
+  localStorage.setItem(chaveCredenciais(), JSON.stringify(creds));
   toast(`Credencial ${BANCOS.find(b=>b.id===id).nome} salva`, 'success');
   renderCredenciais();
 }
@@ -855,7 +865,10 @@ function salvarConfiguracoes() {
 
 function limparTodosDados() {
   if (!confirm('Isso removerá todos os dados do sistema. Tem certeza?')) return;
-  ['af_historico','af_clientes','af_lojistas','af_credenciais'].forEach(k => localStorage.removeItem(k));
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('af_credenciais'))
+    .forEach(k => localStorage.removeItem(k));
+  ['af_historico','af_clientes','af_lojistas'].forEach(k => localStorage.removeItem(k));
   toast('Dados limpos', 'success');
 }
 

@@ -17,29 +17,16 @@
       display: none;
     }
     .error-msg.show { display: block; }
-    .demo-creds {
-      margin-top: 24px;
-      background: rgba(0,194,255,0.05);
-      border: 1px solid rgba(0,194,255,0.15);
-      border-radius: 10px;
-      padding: 14px 16px;
-    }
-    .demo-creds p { font-size: 0.75rem; color: var(--gray-400); margin-bottom: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
-    .demo-item {
-      font-size: 0.8rem;
-      color: var(--gray-200);
-      margin-bottom: 4px;
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .demo-item code {
-      color: var(--cyan);
+    .success-msg {
       background: rgba(0,194,255,0.1);
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-size: 0.78rem;
+      border: 1px solid rgba(0,194,255,0.3);
+      color: var(--cyan);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      display: none;
     }
+    .success-msg.show { display: block; }
     .fill-btn {
       font-size: 0.72rem;
       color: var(--cyan);
@@ -74,57 +61,87 @@
         </div>
 
         <div id="errorMsg" class="error-msg">E-mail ou senha incorretos.</div>
+        <div id="successMsg" class="success-msg"></div>
 
-        <button class="btn btn-primary btn-full btn-lg" onclick="fazerLogin()">
+        <button class="btn btn-primary btn-full btn-lg" id="btnEntrar" onclick="fazerLogin()">
           Entrar
         </button>
-      </div>
-
-      <div class="demo-creds">
-        <p>🔑 Credenciais de demonstração</p>
-        <div class="demo-item">
-          <span>Admin</span>
-          <span><code>admin@autofinance.com</code> / <code>admin123</code></span>
-        </div>
-        <div class="demo-item">
-          <span>Lojista 1</span>
-          <span><code>lojista1@autonova.com</code> / <code>loja123</code></span>
-        </div>
-        <div class="demo-item">
-          <span>Lojista 2</span>
-          <span><code>lojista2@meganove.com</code> / <code>mega123</code></span>
-        </div>
-        <button class="fill-btn" onclick="preencherDemo('admin')">Preencher como Admin</button>
+        <button class="fill-btn" style="margin-top:12px" onclick="esqueciSenha()">Esqueci minha senha</button>
       </div>
     </div>
   </div>
 
+  <script type="module" src="js/firebase-config.js"></script>
   <script>
-    const USERS = [
-      { email: 'admin@autofinance.com', senha: 'admin123', role: 'admin', nome: 'Administrador', loja: 'AutoFinance' },
-      { email: 'lojista1@autonova.com', senha: 'loja123', role: 'lojista', nome: 'João Silva', loja: 'AutoNova' },
-      { email: 'lojista2@meganove.com', senha: 'mega123', role: 'lojista', nome: 'Maria Souza', loja: 'MegaNove' },
-    ];
+    let fb = null;
+    window.addEventListener('af-firebase-ready', () => { fb = window.AF_FIREBASE; });
 
-    function fazerLogin() {
+    function setLoading(loading) {
+      const btn = document.getElementById('btnEntrar');
+      btn.disabled = loading;
+      btn.textContent = loading ? 'Entrando...' : 'Entrar';
+    }
+
+    async function fazerLogin() {
       const email = document.getElementById('email').value.trim();
       const senha = document.getElementById('senha').value;
       const err   = document.getElementById('errorMsg');
+      const ok    = document.getElementById('successMsg');
+      err.classList.remove('show');
+      ok.classList.remove('show');
 
-      const user = USERS.find(u => u.email === email && u.senha === senha);
-      if (!user) {
+      if (!email || !senha) {
+        err.textContent = 'Informe e-mail e senha.';
         err.classList.add('show');
         return;
       }
-      err.classList.remove('show');
-      sessionStorage.setItem('afUser', JSON.stringify(user));
-      window.location.href = 'index.html';
+      if (!fb) { err.textContent = 'Carregando, tente novamente em um instante.'; err.classList.add('show'); return; }
+
+      setLoading(true);
+      try {
+        const cred = await fb.signInWithEmailAndPassword(fb.auth, email, senha);
+        const snap = await fb.getDoc(fb.doc(fb.db, 'usuarios', cred.user.uid));
+        if (!snap.exists()) {
+          err.textContent = 'Usuário sem cadastro completo. Contate o administrador.';
+          err.classList.add('show');
+          setLoading(false);
+          return;
+        }
+        const dados = snap.data();
+        const user = { uid: cred.user.uid, email, nome: dados.nome, role: dados.role, loja: dados.loja || '' };
+        sessionStorage.setItem('afUser', JSON.stringify(user));
+        sessionStorage.setItem('afPrimeiroAcesso', dados.primeiroAcesso ? '1' : '0');
+        window.location.href = 'index.html';
+      } catch (e) {
+        err.textContent = 'E-mail ou senha incorretos.';
+        err.classList.add('show');
+        setLoading(false);
+      }
     }
 
-    function preencherDemo(tipo) {
-      const u = USERS.find(x => x.role === tipo) || USERS[0];
-      document.getElementById('email').value = u.email;
-      document.getElementById('senha').value = u.senha;
+    async function esqueciSenha() {
+      const email = document.getElementById('email').value.trim();
+      const err = document.getElementById('errorMsg');
+      const ok  = document.getElementById('successMsg');
+      err.classList.remove('show');
+      ok.classList.remove('show');
+
+      if (!email) {
+        err.textContent = 'Digite seu e-mail no campo acima para receber o link de redefinição.';
+        err.classList.add('show');
+        return;
+      }
+      if (!fb) { err.textContent = 'Carregando, tente novamente em um instante.'; err.classList.add('show'); return; }
+
+      try {
+        await fb.sendPasswordResetEmail(fb.auth, email);
+        ok.textContent = 'Enviamos um link de redefinição de senha para seu e-mail.';
+        ok.classList.add('show');
+      } catch (e) {
+        // Não revela se o e-mail existe ou não, por segurança.
+        ok.textContent = 'Se este e-mail estiver cadastrado, você receberá um link de redefinição.';
+        ok.classList.add('show');
+      }
     }
 
     document.addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin(); });

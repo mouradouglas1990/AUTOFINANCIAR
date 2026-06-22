@@ -28,6 +28,8 @@ let bancosSel     = new Set(BANCOS.map(b => b.id));
 let ultimoResultado = [];
 let prazoSel      = 36;
 let tipoSel       = 'seminovo';
+let fb            = null;
+window.addEventListener('af-firebase-ready', () => { fb = window.AF_FIREBASE; });
 
 // ── INIT ──────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,12 +37,56 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!saved) { window.location.href = 'login.html'; return; }
   currentUser = JSON.parse(saved);
 
+  if (sessionStorage.getItem('afPrimeiroAcesso') === '1') {
+    mostrarTrocaSenhaObrigatoria();
+    return;
+  }
+
   renderUserInfo();
   renderSidebar();
   renderBanksGrid();
   showTab('simular');
   aplicarPermissoes();
 });
+
+// ── TROCA DE SENHA NO PRIMEIRO ACESSO ─────────
+function mostrarTrocaSenhaObrigatoria() {
+  document.getElementById('pageContent').innerHTML = `
+    <div style="max-width:420px;margin:60px auto;text-align:center">
+      <h2 style="margin-bottom:8px">Defina sua nova senha</h2>
+      <p class="text-muted text-sm mb-24">Este é seu primeiro acesso. Por segurança, crie uma nova senha antes de continuar.</p>
+      <div class="form-group mb-8"><input type="password" id="novaSenha1" placeholder="Nova senha (mín. 6 caracteres)"></div>
+      <div class="form-group mb-8"><input type="password" id="novaSenha2" placeholder="Confirme a nova senha"></div>
+      <div id="trocaSenhaErro" style="color:#FF4D6A;font-size:0.85rem;margin-bottom:12px;display:none"></div>
+      <button class="btn btn-primary btn-full" onclick="confirmarTrocaSenha()">Salvar e continuar</button>
+    </div>`;
+}
+
+async function confirmarTrocaSenha() {
+  const s1 = document.getElementById('novaSenha1').value;
+  const s2 = document.getElementById('novaSenha2').value;
+  const erro = document.getElementById('trocaSenhaErro');
+  erro.style.display = 'none';
+
+  if (!s1 || s1.length < 6) { erro.textContent = 'A senha deve ter no mínimo 6 caracteres.'; erro.style.display = 'block'; return; }
+  if (s1 !== s2) { erro.textContent = 'As senhas não coincidem.'; erro.style.display = 'block'; return; }
+  if (!fb || !fb.auth.currentUser) { erro.textContent = 'Sessão expirada, faça login novamente.'; erro.style.display = 'block'; return; }
+
+  try {
+    await fb.updatePassword(fb.auth.currentUser, s1);
+    await fb.updateDoc(fb.doc(fb.db, 'usuarios', currentUser.uid), { primeiroAcesso: false });
+    sessionStorage.setItem('afPrimeiroAcesso', '0');
+    toast('Senha atualizada com sucesso!', 'success');
+    renderUserInfo();
+    renderSidebar();
+    renderBanksGrid();
+    showTab('simular');
+    aplicarPermissoes();
+  } catch (e) {
+    erro.textContent = 'Erro ao salvar nova senha: ' + (e.message || e);
+    erro.style.display = 'block';
+  }
+}
 
 // ── USER INFO ─────────────────────────────────
 function renderUserInfo() {
@@ -59,6 +105,8 @@ function aplicarPermissoes() {
 
 function logout() {
   sessionStorage.removeItem('afUser');
+  sessionStorage.removeItem('afPrimeiroAcesso');
+  if (fb) fb.signOut(fb.auth).catch(() => {});
   window.location.href = 'login.html';
 }
 
@@ -660,17 +708,16 @@ function excluirCliente(id) {
 }
 
 // ── LOJISTAS (ADMIN) ──────────────────────────
-function getLojistas() {
-  const saved = localStorage.getItem('af_lojistas');
-  if (saved) return JSON.parse(saved);
-  return [
-    { id: 1, nome: 'João Silva',  loja: 'AutoNova',  email: 'lojista1@autonova.com',  tel: '(47) 99999-0001', ativo: true },
-    { id: 2, nome: 'Maria Souza', loja: 'MegaNove',  email: 'lojista2@meganove.com',  tel: '(47) 99999-0002', ativo: true },
-  ];
+async function getLojistas() {
+  if (!fb) return [];
+  const q = fb.query(fb.collection(fb.db, 'usuarios'), fb.where('role', '==', 'lojista'));
+  const snap = await fb.getDocs(q);
+  return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
 }
 
-function renderLojistas() {
-  const lojistas = getLojistas();
+async function renderLojistas() {
+  document.getElementById('pageContent').innerHTML = `<p class="text-muted">Carregando lojistas...</p>`;
+  const lojistas = await getLojistas();
   document.getElementById('pageContent').innerHTML = `
     <div class="flex-between mb-24">
       <h2>Lojistas Cadastrados</h2>
@@ -684,10 +731,12 @@ function renderLojistas() {
             <div style="font-weight:700">${l.nome}</div>
             <div style="color:var(--cyan);font-size:0.85rem">${l.loja}</div>
             <div style="color:var(--gray-400);font-size:0.78rem;margin-top:4px">${l.email}</div>
-            <div style="color:var(--gray-400);font-size:0.78rem">${l.tel}</div>
+            <div style="color:var(--gray-400);font-size:0.78rem">${l.tel||''}</div>
+            ${l.primeiroAcesso ? '<div style="color:#FFB020;font-size:0.72rem;margin-top:4px">⏳ Aguardando 1º acesso</div>' : ''}
           </div>
-          <button class="btn btn-danger btn-sm" onclick="excluirLojista(${l.id})">🗑</button>
+          <button class="btn btn-danger btn-sm" onclick="excluirLojista('${l.uid}')">🗑</button>
         </div>`).join('')}
+      ${lojistas.length === 0 ? '<p class="text-muted">Nenhum lojista cadastrado ainda.</p>' : ''}
     </div>
 
     <div class="modal-overlay" id="modalLojista">
@@ -701,11 +750,12 @@ function renderLojistas() {
           <div class="form-group"><label>Loja</label><input type="text" id="nl_loja" placeholder="Nome da loja"></div>
           <div class="form-group"><label>E-mail</label><input type="email" id="nl_email" placeholder="email@loja.com"></div>
           <div class="form-group"><label>Telefone</label><input type="tel" id="nl_tel" placeholder="(47) 99999-9999"></div>
-          <div class="form-group"><label>Senha</label><input type="password" id="nl_senha" placeholder="Senha de acesso"></div>
+          <div class="form-group"><label>Senha temporária</label><input type="text" id="nl_senha" placeholder="Mín. 6 caracteres"></div>
         </div>
+        <p class="text-muted text-sm" style="margin-top:-8px">O lojista vai usar essa senha no primeiro acesso e será obrigado a trocá-la.</p>
         <div class="mt-24 flex gap-8" style="justify-content:flex-end">
           <button class="btn btn-ghost" onclick="fecharModal('modalLojista')">Cancelar</button>
-          <button class="btn btn-primary" onclick="salvarLojista()">Salvar</button>
+          <button class="btn btn-primary" id="btnSalvarLojista" onclick="salvarLojista()">Salvar</button>
         </div>
       </div>
     </div>
@@ -716,34 +766,49 @@ function modalNovoLojista() {
   document.getElementById('modalLojista').classList.add('open');
 }
 
-function salvarLojista() {
-  const nome = document.getElementById('nl_nome').value.trim();
-  if (!nome) { toast('Informe o nome', 'error'); return; }
-  const lojistas = getLojistas();
-  lojistas.push({
-    id:    Date.now(),
-    nome,
-    loja:  document.getElementById('nl_loja').value,
-    email: document.getElementById('nl_email').value,
-    tel:   document.getElementById('nl_tel').value,
-    ativo: true,
-  });
-  localStorage.setItem('af_lojistas', JSON.stringify(lojistas));
-  fecharModal('modalLojista');
-  toast('Lojista cadastrado!', 'success');
-  renderLojistas();
+async function salvarLojista() {
+  const nome  = document.getElementById('nl_nome').value.trim();
+  const email = document.getElementById('nl_email').value.trim();
+  const senha = document.getElementById('nl_senha').value;
+  const loja  = document.getElementById('nl_loja').value.trim();
+  const tel   = document.getElementById('nl_tel').value.trim();
+
+  if (!nome)  { toast('Informe o nome', 'error'); return; }
+  if (!email) { toast('Informe o e-mail', 'error'); return; }
+  if (!senha || senha.length < 6) { toast('Senha temporária deve ter ao menos 6 caracteres', 'error'); return; }
+  if (!fb) { toast('Firebase ainda carregando, tente novamente', 'error'); return; }
+
+  const btn = document.getElementById('btnSalvarLojista');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  try {
+    const cred = await fb.createUserWithEmailAndPassword(fb.auth, email, senha);
+    await fb.setDoc(fb.doc(fb.db, 'usuarios', cred.user.uid), {
+      nome, email, loja, tel, role: 'lojista', primeiroAcesso: true,
+    });
+    fecharModal('modalLojista');
+    toast('Lojista cadastrado! Informe a senha temporária a ele.', 'success');
+    renderLojistas();
+  } catch (e) {
+    const msg = e.code === 'auth/email-already-in-use' ? 'Este e-mail já está cadastrado.' : ('Erro: ' + (e.message || e));
+    toast(msg, 'error');
+    btn.disabled = false; btn.textContent = 'Salvar';
+  }
 }
 
-function excluirLojista(id) {
-  if (!confirm('Remover este lojista?')) return;
-  const lojistas = getLojistas().filter(l => l.id !== id);
-  localStorage.setItem('af_lojistas', JSON.stringify(lojistas));
-  toast('Lojista removido', 'success');
-  renderLojistas();
+async function excluirLojista(uid) {
+  if (!confirm('Remover este lojista? Isso não exclui o login dele do Firebase Authentication (apenas o cadastro no sistema), você pode fazer isso manualmente no console do Firebase se necessário.')) return;
+  try {
+    await fb.deleteDoc(fb.doc(fb.db, 'usuarios', uid));
+    toast('Lojista removido', 'success');
+    renderLojistas();
+  } catch (e) {
+    toast('Erro ao remover: ' + (e.message || e), 'error');
+  }
 }
 
 // ── RELATÓRIOS ────────────────────────────────
-function renderRelatorios() {
+async function renderRelatorios() {
   const hist = getHistorico();
   const totalSim   = hist.length;
   const totalValor = hist.reduce((s, h) => s + (h.valor || 0), 0);
@@ -757,7 +822,7 @@ function renderRelatorios() {
       <div class="stat-card"><div class="stat-label">Total de Simulações</div><div class="stat-value cyan">${totalSim}</div></div>
       <div class="stat-card"><div class="stat-label">Volume Simulado</div><div class="stat-value">${fmt(totalValor)}</div></div>
       <div class="stat-card"><div class="stat-label">Clientes Cadastrados</div><div class="stat-value green">${getClientes().length}</div></div>
-      <div class="stat-card"><div class="stat-label">Lojistas Ativos</div><div class="stat-value">${getLojistas().length}</div></div>
+      <div class="stat-card"><div class="stat-label">Lojistas Ativos</div><div class="stat-value" id="statLojistas">…</div></div>
     </div>
 
     <div class="card">
@@ -774,6 +839,10 @@ function renderRelatorios() {
           </div>`).join('')}
     </div>
   `;
+
+  const lojistas = await getLojistas();
+  const elLoj = document.getElementById('statLojistas');
+  if (elLoj) elLoj.textContent = lojistas.length;
 }
 
 // ── CREDENCIAIS ───────────────────────────────

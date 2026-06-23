@@ -494,6 +494,18 @@ input[type="tel"]::placeholder { color: var(--gray-400); }
 .badge-warn { background: rgba(255,184,48,0.15); color: var(--yellow); }
 .badge-err  { background: rgba(255,77,106,0.15); color: var(--red); }
 
+.badge-origem {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  vertical-align: middle;
+}
+.badge-integrado { background: rgba(0,194,255,0.15); color: var(--cyan); }
+
 /* ── EXPORT ACTIONS ── */
 .export-bar {
   display: flex;

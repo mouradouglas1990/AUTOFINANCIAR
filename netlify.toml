@@ -7,3 +7,16 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# ── Cabeçalhos de segurança ──────────────────────────
+# Aplicados a todas as rotas. Não usamos Content-Security-Policy estrita
+# aqui porque o app depende de handlers inline (onclick=...) e scripts
+# inline — uma CSP rígida exigiria refatorar isso antes (ver recomendações).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"

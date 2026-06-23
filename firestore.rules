@@ -1,1 +1,75 @@
-firestore.rules
+rules_version = '2';
+
+// ============================================================
+// AutoFinance Multibancos — Regras de Segurança do Firestore
+// ============================================================
+//
+// ATENÇÃO: este arquivo PRECISA ser publicado no Firebase para valer.
+//   firebase deploy --only firestore:rules
+// (ou cole o conteúdo em Firestore Database > Regras no console).
+//
+// Sem regras válidas publicadas, o banco fica EXPOSTO: qualquer pessoa
+// com a config pública (que está em js/firebase-config.js) consegue ler
+// e gravar todos os dados. A config ser pública é normal — a segurança
+// real é feita AQUI.
+//
+// Modelo de dados:
+//   usuarios/{uid} -> { nome, email, role: 'admin'|'lojista', loja, primeiroAcesso }
+//
+// Princípios aplicados:
+//   - Nega tudo por padrão.
+//   - Cada usuário só lê o próprio documento; admin lê todos.
+//   - Ninguém consegue se promover a 'admin' pelo app (anti-escalonamento).
+//   - Só admin apaga usuários.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function selfDoc() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && selfDoc().role == 'admin';
+    }
+
+    match /usuarios/{uid} {
+
+      // Leitura: o próprio usuário lê o seu doc; admin lê todos.
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+
+      // Criação: o usuário só cria o PRÓPRIO doc e NUNCA como 'admin'.
+      // (Isso mantém o fluxo atual de cadastro de lojista funcionando.
+      //  O primeiro admin deve ser criado manualmente no console do Firebase.)
+      //
+      // HARDENING RECOMENDADO: mover a criação de lojistas para uma
+      // Cloud Function com Admin SDK e trocar esta regra por
+      // `allow create: if isAdmin();`, desabilitando o cadastro de
+      // contas pelo cliente. Veja .claude/agents/seguranca-dados.md.
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'lojista';
+
+      // Atualização: admin pode tudo. O próprio usuário pode atualizar
+      // o seu doc desde que NÃO altere o próprio papel (role).
+      allow update: if isAdmin()
+        || (request.auth.uid == uid
+            && request.resource.data.role == resource.data.role);
+
+      // Exclusão: só admin.
+      allow delete: if isAdmin();
+    }
+
+    // Qualquer outro caminho é bloqueado por padrão.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

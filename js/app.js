@@ -354,7 +354,8 @@ function setPrazo(p) {
 
 function setTipo(t) {
   tipoSel = t;
-  document.querySelectorAll('.tipo-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(t)));
+  const labels = { novo: 'Novo', seminovo: 'Seminovo', usado: 'Usado' };
+  document.querySelectorAll('.tipo-btn').forEach(b => b.classList.toggle('active', b.textContent.trim() === labels[t]));
 }
 
 // ── BANCOS TOGGLE ─────────────────────────────
@@ -385,8 +386,6 @@ async function simular() {
   const btn = document.getElementById('btnSimular');
   btn.innerHTML = '<span class="loading-spin"></span> Simulando...';
   btn.disabled = true;
-
-  await delay(900);
 
   const financiado = valor - entrada;
   const bancosParaSimular = BANCOS.filter(b => bancosSel.has(b.id));
@@ -432,7 +431,7 @@ function renderResultados(resultados) {
   body.innerHTML = resultados.map((r, i) => `
     <tr>
       <td class="bank-name">
-        <span class="bank-dot"></span>${r.banco}
+        <span class="bank-dot"></span>${esc(r.banco)}
         ${r.origem === 'integrado' ? '<span class="badge-origem badge-integrado" title="Dados reais via API do banco">API</span>' : ''}
       </td>
       <td><span class="badge ${r.status === 'Aprovado' ? 'badge-ok' : r.status === 'Erro' ? 'badge-err' : 'badge-warn'}">${r.status}</span></td>
@@ -468,6 +467,19 @@ function limparSimulacao() {
   if (stats) stats.style.display = 'none';
 }
 
+// ── SEGURANÇA: escapa texto antes de injetar em innerHTML (anti-XSS) ──
+// Nome de cliente, e-mail, loja etc. vêm do usuário / Firestore e NUNCA
+// devem ser inseridos crus no HTML — um valor como <img onerror=...> executaria
+// código no contexto de quem abre a tela (inclusive o admin).
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ── FORMATAÇÃO ────────────────────────────────
 function fmt(v) {
   return 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -479,7 +491,6 @@ async function buscarPlaca() {
   if (placa.length < 7) { toast('Placa inválida', 'error'); return; }
 
   toast('Consultando placa...', 'info');
-  await delay(1200);
 
   // Demo data
   const demo = {
@@ -570,7 +581,7 @@ function renderHistorico() {
         <div class="history-item" onclick="verHistoricoItem(${h.id})">
           <div class="history-icon">🚗</div>
           <div class="history-info">
-            <div class="history-title">${h.cliente || 'Sem nome'} — ${h.veiculo || '—'}</div>
+            <div class="history-title">${esc(h.cliente || 'Sem nome')} — ${esc(h.veiculo || '—')}</div>
             <div class="history-sub">${fmt(h.valor)} · ${h.prazo}x · ${h.bancos} bancos simulados</div>
           </div>
           <div class="history-date">${h.data}</div>
@@ -628,12 +639,12 @@ function renderClientes() {
           <tbody>
             ${clientes.map(c => `
               <tr>
-                <td style="font-weight:600">${c.nome}</td>
-                <td>${c.cpf}</td>
-                <td>${c.tel}</td>
-                <td>${c.email}</td>
+                <td style="font-weight:600">${esc(c.nome)}</td>
+                <td>${esc(c.cpf)}</td>
+                <td>${esc(c.tel)}</td>
+                <td>${esc(c.email)}</td>
                 <td>${fmt(parseFloat(c.renda)||0)}</td>
-                <td style="color:var(--gray-400);font-size:0.8rem">${c.data}</td>
+                <td style="color:var(--gray-400);font-size:0.8rem">${esc(c.data)}</td>
                 <td>
                   <button class="btn btn-ghost btn-sm" onclick="excluirCliente(${c.id})">🗑</button>
                 </td>
@@ -736,12 +747,12 @@ async function renderLojistas() {
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
       ${lojistas.map(l => `
         <div class="lojista-card">
-          <div class="lojista-avatar">${l.nome[0]}</div>
+          <div class="lojista-avatar">${esc((l.nome||'?')[0])}</div>
           <div style="flex:1">
-            <div style="font-weight:700">${l.nome}</div>
-            <div style="color:var(--cyan);font-size:0.85rem">${l.loja}</div>
-            <div style="color:var(--gray-400);font-size:0.78rem;margin-top:4px">${l.email}</div>
-            <div style="color:var(--gray-400);font-size:0.78rem">${l.tel||''}</div>
+            <div style="font-weight:700">${esc(l.nome)}</div>
+            <div style="color:var(--cyan);font-size:0.85rem">${esc(l.loja)}</div>
+            <div style="color:var(--gray-400);font-size:0.78rem;margin-top:4px">${esc(l.email)}</div>
+            <div style="color:var(--gray-400);font-size:0.78rem">${esc(l.tel||'')}</div>
             ${l.primeiroAcesso ? '<div style="color:#FFB020;font-size:0.72rem;margin-top:4px">⏳ Aguardando 1º acesso</div>' : ''}
           </div>
           <button class="btn btn-danger btn-sm" onclick="excluirLojista('${l.uid}')">🗑</button>
@@ -880,15 +891,15 @@ function renderCredenciais() {
           </div>
           <div class="form-group mb-8">
             <label>Login / CPF</label>
-            <input type="text" id="cred_login_${b.id}" value="${c.login||''}" placeholder="login">
+            <input type="text" id="cred_login_${b.id}" value="${esc(c.login)}" placeholder="login">
           </div>
           <div class="form-group mb-8">
             <label>Senha</label>
-            <input type="password" id="cred_senha_${b.id}" value="${c.senha||''}" placeholder="••••••">
+            <input type="password" id="cred_senha_${b.id}" value="${esc(c.senha)}" placeholder="••••••">
           </div>
           <div class="form-group mb-8">
             <label>Site do Portal</label>
-            <input type="text" id="cred_site_${b.id}" value="${c.site || ''}" placeholder="https://...">
+            <input type="text" id="cred_site_${b.id}" value="${esc(c.site)}" placeholder="https://...">
           </div>
           <button class="btn btn-secondary btn-sm btn-full" onclick="salvarCredencial('${b.id}')">Salvar</button>
         </div>`;
@@ -917,11 +928,11 @@ function renderConfiguracoes() {
       <div class="card-title mb-16">⚙️ Sistema</div>
       <div class="form-group mb-16">
         <label>Nome da Empresa</label>
-        <input type="text" id="conf_empresa" value="${localStorage.getItem('af_empresa')||'AutoFinance'}" placeholder="Nome da empresa">
+        <input type="text" id="conf_empresa" value="${esc(localStorage.getItem('af_empresa')||'AutoFinance')}" placeholder="Nome da empresa">
       </div>
       <div class="form-group mb-24">
         <label>Chave API FIPE/Placa</label>
-        <input type="text" id="conf_api" value="${localStorage.getItem('af_apikey')||''}" placeholder="Insira sua chave de API">
+        <input type="text" id="conf_api" value="${esc(localStorage.getItem('af_apikey')||'')}" placeholder="Insira sua chave de API">
       </div>
       <button class="btn btn-primary" onclick="salvarConfiguracoes()">Salvar Configurações</button>
     </div>

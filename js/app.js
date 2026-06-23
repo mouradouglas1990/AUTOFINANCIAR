@@ -369,30 +369,17 @@ async function simular() {
   await delay(900);
 
   const financiado = valor - entrada;
-  const resultados = [];
+  const bancosParaSimular = BANCOS.filter(b => bancosSel.has(b.id));
 
-  for (const banco of BANCOS.filter(b => bancosSel.has(b.id))) {
-    const fator   = tipoSel === 'usado' ? 0.15 : tipoSel === 'novo' ? -0.05 : 0;
-    const taxa    = randomBetween(banco.taxaMin + fator, banco.taxaMax + fator);
-    const parcela = calcParcela(financiado, taxa / 100, prazo);
-    const totalPago = parcela * prazo;
-    const cet = (taxa + banco.cetAdd) * 12;
-    const entradaMin = valor * 0.20;
-    const aprovado = financiado > 0 && financiado <= valor * 0.80;
+  const dadosEntrada = {
+    valorVeiculo: valor,
+    valorEntrada: entrada,
+    financiado,
+    prazoMeses: prazo,
+    tipoVeiculo: tipoSel,
+  };
 
-    resultados.push({
-      banco:      banco.nome,
-      bancoId:    banco.id,
-      status:     aprovado ? 'Aprovado' : 'Pendente',
-      financiado,
-      entradaMin,
-      parcela,
-      prazo,
-      taxa,
-      cet,
-      totalPago,
-    });
-  }
+  const resultados = await window.AF_BANK_ADAPTERS.simularEmTodosBancos(bancosParaSimular, dadosEntrada);
 
   resultados.sort((a, b) => a.parcela - b.parcela);
   ultimoResultado = resultados;
@@ -424,15 +411,18 @@ function renderResultados(resultados) {
 
   body.innerHTML = resultados.map((r, i) => `
     <tr>
-      <td class="bank-name"><span class="bank-dot"></span>${r.banco}</td>
-      <td><span class="badge ${r.status === 'Aprovado' ? 'badge-ok' : 'badge-warn'}">${r.status}</span></td>
+      <td class="bank-name">
+        <span class="bank-dot"></span>${r.banco}
+        ${r.origem === 'integrado' ? '<span class="badge-origem badge-integrado" title="Dados reais via API do banco">API</span>' : ''}
+      </td>
+      <td><span class="badge ${r.status === 'Aprovado' ? 'badge-ok' : r.status === 'Erro' ? 'badge-err' : 'badge-warn'}">${r.status}</span></td>
       <td>${fmt(r.financiado)}</td>
       <td>${fmt(r.entradaMin)}</td>
-      <td class="valor-destaque">${fmt(r.parcela)}</td>
+      <td class="valor-destaque">${r.status === 'Erro' ? '—' : fmt(r.parcela)}</td>
       <td>${r.prazo}x</td>
-      <td>${r.taxa.toFixed(2)}%</td>
-      <td>${r.cet.toFixed(2)}%</td>
-      <td class="valor-total">${fmt(r.totalPago)}</td>
+      <td>${r.status === 'Erro' ? '—' : r.taxa.toFixed(2) + '%'}</td>
+      <td>${r.status === 'Erro' ? '—' : r.cet.toFixed(2) + '%'}</td>
+      <td class="valor-total">${r.status === 'Erro' ? '—' : fmt(r.totalPago)}</td>
       <td><button class="portal-btn" onclick="abrirPortal('${r.bancoId}')">↗ Portal</button></td>
     </tr>
   `).join('');

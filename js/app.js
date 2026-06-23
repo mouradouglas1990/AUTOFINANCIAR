@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderBanksGrid();
   showTab('simular');
   aplicarPermissoes();
+  aplicarPreferenciaSidebar();
 });
 
 // ── TROCA DE SENHA NO PRIMEIRO ACESSO ─────────
@@ -82,6 +83,7 @@ async function confirmarTrocaSenha() {
     renderBanksGrid();
     showTab('simular');
     aplicarPermissoes();
+    aplicarPreferenciaSidebar();
   } catch (e) {
     erro.textContent = 'Erro ao salvar nova senha: ' + (e.message || e);
     erro.style.display = 'block';
@@ -119,6 +121,24 @@ function toggleSidebar() {
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// ── SIDEBAR RECOLHÍVEL (desktop) ──────────────
+function toggleSidebarCollapse() {
+  const sidebar = document.getElementById('sidebar');
+  const collapsed = sidebar.classList.toggle('collapsed');
+  localStorage.setItem('af_sidebar_collapsed', collapsed ? '1' : '0');
+  const btn = document.getElementById('sidebarCollapseBtn');
+  if (btn) btn.title = collapsed ? 'Expandir menu' : 'Recolher menu';
+}
+
+function aplicarPreferenciaSidebar() {
+  if (localStorage.getItem('af_sidebar_collapsed') === '1') {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.add('collapsed');
+    const btn = document.getElementById('sidebarCollapseBtn');
+    if (btn) btn.title = 'Expandir menu';
+  }
 }
 
 // ── RENDERIZA SIDEBAR NAV ─────────────────────

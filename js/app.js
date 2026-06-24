@@ -895,7 +895,10 @@ function renderCredenciais() {
           </div>
           <div class="form-group mb-8">
             <label>Senha</label>
-            <input type="password" id="cred_senha_${b.id}" value="${esc(c.senha)}" placeholder="••••••">
+            <div class="senha-wrap">
+              <input type="password" id="cred_senha_${b.id}" value="${esc(c.senha)}" placeholder="••••••">
+              <button type="button" class="senha-toggle" onclick="toggleSenha('cred_senha_${b.id}', this)" title="Mostrar/ocultar senha" aria-label="Mostrar senha">👁️</button>
+            </div>
           </div>
           <div class="form-group mb-8">
             <label>Site do Portal</label>
@@ -918,6 +921,18 @@ function salvarCredencial(id) {
   localStorage.setItem(chaveCredenciais(), JSON.stringify(creds));
   toast(`Credencial ${BANCOS.find(b=>b.id===id).nome} salva`, 'success');
   renderCredenciais();
+}
+
+// Mostra/oculta a senha de uma credencial (alterna o tipo do input e o ícone).
+function toggleSenha(id, btn) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  const mostrar = input.type === 'password';
+  input.type = mostrar ? 'text' : 'password';
+  if (btn) {
+    btn.textContent = mostrar ? '🙈' : '👁️';
+    btn.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+  }
 }
 
 // ── CONFIGURAÇÕES ─────────────────────────────
